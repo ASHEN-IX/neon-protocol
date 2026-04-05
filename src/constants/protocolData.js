@@ -1,11 +1,11 @@
 export const CYPHER_CHARS = "アイウエオカキクケコ█▓▒░01∑∆Ω∞≈≠∂∫ΨΦΓ╬╫╪│┼";
 
 export const RIDDLE_LINES = [
-  "When the hour leans toward the night,",
-  "When twin candles sway in fading light,",
-  "When a trio of claps sets hearts alight,",
-  "When half a cheer rises, piercing the night,",
-  "Then shall the final dance ignite.",
+  "When the new hour drifts into night,",
+  "When a single candle glimmers bright,",
+  "When half a trio of claps takes flight,",
+  "When silence stretches, soft as light,",
+  "Then shall the next dance ignite.",
 ];
 
 export const ANSWER = "9";
