@@ -12,12 +12,15 @@ export default function NeonProtocolPage() {
   const [solved, setSolved] = useState(false);
   const transitionTimeoutRef = useRef(null);
 
-  const handleSubmit = useCallback(() => {
-    if (!input.trim()) {
+  const handleSubmit = useCallback((submittedValue) => {
+    const value =
+      typeof submittedValue === "string" ? submittedValue : input;
+
+    if (!value.trim()) {
       setError("Enter an answer");
       return;
     }
-    if (input.trim() === ANSWER) {
+    if (value.trim() === ANSWER) {
       setSolved(true);
       setError("");
     } else {

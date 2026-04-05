@@ -3,6 +3,42 @@ import { RIDDLE_LINES, ANSWER, CLUES } from "../../constants/protocolData";
 import CipherReveal from "../effects/CipherReveal";
 import { SoundManager } from "../../utils/soundManager";
 
+const ATTEMPT_STORAGE_KEY = "neon_protocol_attempt_v1";
+
+function readAttemptSnapshot() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ATTEMPT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.consumed !== true || !Array.isArray(parsed.history)) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeAttemptSnapshot(snapshot) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(ATTEMPT_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
 export default function TerminalRiddle({
   input,
   setInput,
@@ -10,21 +46,28 @@ export default function TerminalRiddle({
   error,
   solved,
 }) {
+  const persistedAttemptRef = useRef(readAttemptSnapshot());
+  const persistedAttempt = persistedAttemptRef.current;
   const [commandText, setCommandText] = useState("");
   const [showRiddle, setShowRiddle] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [terminalPos, setTerminalPos] = useState({ x: 0, y: 0 });
-  const [attempts, setAttempts] = useState(0);
+  const [attempts, setAttempts] = useState(persistedAttempt ? 1 : 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showHints, setShowHints] = useState(false);
   const [hasFlicker, setHasFlicker] = useState(false);
   const [revealedAnswer, setRevealedAnswer] = useState("");
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(
+    persistedAttempt && Array.isArray(persistedAttempt.history)
+      ? persistedAttempt.history
+      : []
+  );
   const [protocolText, setProtocolText] = useState("");
   const [showProtocolMessage, setShowProtocolMessage] = useState(false);
   const [terminalFade, setTerminalFade] = useState(1);
   const [terminalKey, setTerminalKey] = useState(0);
+  const [attemptConsumed, setAttemptConsumed] = useState(Boolean(persistedAttempt));
   const terminalRef = useRef(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
@@ -32,6 +75,12 @@ export default function TerminalRiddle({
 
   // Auto-type command
   useEffect(() => {
+    if (attemptConsumed) {
+      setCommandText("");
+      setShowRiddle(false);
+      return undefined;
+    }
+
     const command = "show riddle";
     let index = 0;
     const interval = setInterval(() => {
@@ -45,7 +94,7 @@ export default function TerminalRiddle({
       }
     }, 150);
     return () => clearInterval(interval);
-  }, [terminalKey]);
+  }, [attemptConsumed, terminalKey]);
 
   // Random flicker effect
   useEffect(() => {
@@ -112,9 +161,21 @@ export default function TerminalRiddle({
   }, [showHints]);
 
   const handleSubmit = () => {
-    if (isSubmitting || solved || !input.trim()) return;
+    if (attemptConsumed || isSubmitting || solved || !input.trim()) return;
 
     const originalInput = input.trim();
+    const userAttempt = `> attempt 1: "${originalInput}"`;
+
+    setAttemptConsumed(true);
+    setAttempts(1);
+    writeAttemptSnapshot({
+      consumed: true,
+      attempts: 1,
+      input: originalInput,
+      result: "pending",
+      history: [userAttempt],
+      updatedAt: Date.now(),
+    });
 
     // Fade out old terminal
     setTerminalFade(0);
@@ -131,27 +192,12 @@ export default function TerminalRiddle({
 
       setIsSubmitting(true);
       SoundManager.playBeep(400, 50);
-      setAttempts((prev) => prev + 1);
+      setAttempts(1);
 
-      const userAttempt = `> attempt ${attempts + 1}: "${originalInput}"`;
-      const newHistory = [...history, userAttempt];
+      const newHistory = [userAttempt];
       setHistory(newHistory);
 
-      // Re-show riddle in new terminal with slower typing
-      const riddle = "show riddle";
-      let typeIndex = 0;
-      const typeInterval = setInterval(() => {
-        if (typeIndex <= riddle.length) {
-          setCommandText(riddle.substring(0, typeIndex));
-          SoundManager.playTypeSound();
-          typeIndex++;
-        } else {
-          clearInterval(typeInterval);
-          setTimeout(() => setShowRiddle(true), 300);
-        }
-      }, 150);
-
-      // Start typing "trying protocol" after riddle appears
+      // Start typing "trying protocol"
       setTimeout(() => {
         let index = 0;
         const protocolCommand = "trying protocol";
@@ -176,8 +222,9 @@ export default function TerminalRiddle({
 
               // After showing message, validate answer
               setTimeout(() => {
-                originalOnSubmit();
+                originalOnSubmit(originalInput);
                 const finalHistory = [...messageHistory];
+                const isCorrect = originalInput === ANSWER;
                 if (originalInput === ANSWER) {
                   SoundManager.playSuccess();
                   finalHistory.push("");
@@ -191,11 +238,20 @@ export default function TerminalRiddle({
                 setIsSubmitting(false);
                 setProtocolText("");
                 setShowProtocolMessage(false);
+                setShowRiddle(false);
+                writeAttemptSnapshot({
+                  consumed: true,
+                  attempts: 1,
+                  input: originalInput,
+                  result: isCorrect ? "success" : "error",
+                  history: finalHistory,
+                  updatedAt: Date.now(),
+                });
               }, 2000);
             }, 300);
           }
         }, 150);
-      }, 1800);
+      }, 400);
     }, 400);
   };
 
@@ -398,35 +454,37 @@ export default function TerminalRiddle({
           )}
 
           {/* Command line */}
-          <div
-            style={{
-              marginBottom: showRiddle ? 28 : 0,
-              minHeight: 40,
-              display: "flex",
-              alignItems: "center",
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <span style={{ color: "#0ff", marginRight: 12, fontSize: 18 }}>
-              ▶
-            </span>
-            <span style={{ color: "#c0f", fontSize: 16, letterSpacing: 1 }}>
-              {commandText}
-            </span>
-            {!showRiddle && (
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 10,
-                  height: 20,
-                  background: "#c0f",
-                  marginLeft: 6,
-                  animation: "blink 0.8s step-end infinite",
-                  boxShadow: "0 0 8px #c0f",
-                }}
-              />
-            )}
-          </div>
+          {!attemptConsumed && (
+            <div
+              style={{
+                marginBottom: showRiddle ? 28 : 0,
+                minHeight: 40,
+                display: "flex",
+                alignItems: "center",
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <span style={{ color: "#0ff", marginRight: 12, fontSize: 18 }}>
+                ▶
+              </span>
+              <span style={{ color: "#c0f", fontSize: 16, letterSpacing: 1 }}>
+                {commandText}
+              </span>
+              {!showRiddle && (
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 10,
+                    height: 20,
+                    background: "#c0f",
+                    marginLeft: 6,
+                    animation: "blink 0.8s step-end infinite",
+                    boxShadow: "0 0 8px #c0f",
+                  }}
+                />
+              )}
+            </div>
+          )}
 
           {/* Riddle output */}
           {showRiddle && (
