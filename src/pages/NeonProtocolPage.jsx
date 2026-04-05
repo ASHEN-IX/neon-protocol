@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import ParticleLoader from "../components/loader/ParticleLoader";
+import TerminalLoader from "../components/loader/TerminalLoader";
 import GridScan from "../components/effects/GridScan";
 import TerminalRiddleEnhanced from "../components/panels/TerminalRiddleEnhanced";
 import MatrixRain from "../components/effects/MatrixRain";
@@ -85,7 +85,7 @@ export default function NeonProtocolPage() {
             pointerEvents: loadingPhase === "transition" ? "none" : "auto",
           }}
         >
-          <ParticleLoader onComplete={handleLoaderComplete} />
+          <TerminalLoader onComplete={handleLoaderComplete} />
         </div>
       )}
 
