@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { RIDDLE_LINES, ANSWER, CLUES } from "../../constants/protocolData";
+import CipherReveal from "../effects/CipherReveal";
 import { SoundManager } from "../../utils/soundManager";
 
 export default function TerminalRiddle({
@@ -29,9 +30,21 @@ export default function TerminalRiddle({
 
   SoundManager.init();
 
-  // Auto-type command - removed, just show clean terminal
+  // Auto-type command
   useEffect(() => {
-    // Terminal is ready, no initial typing needed
+    const command = "show riddle";
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index <= command.length) {
+        setCommandText(command.substring(0, index));
+        SoundManager.playTypeSound();
+        index++;
+      } else {
+        clearInterval(interval);
+        setTimeout(() => setShowRiddle(true), 300);
+      }
+    }, 150);
+    return () => clearInterval(interval);
   }, [terminalKey]);
 
   // Random flicker effect
@@ -124,7 +137,21 @@ export default function TerminalRiddle({
       const newHistory = [...history, userAttempt];
       setHistory(newHistory);
 
-      // Start typing "trying protocol" immediately (no "show riddle" typing)
+      // Re-show riddle in new terminal with slower typing
+      const riddle = "show riddle";
+      let typeIndex = 0;
+      const typeInterval = setInterval(() => {
+        if (typeIndex <= riddle.length) {
+          setCommandText(riddle.substring(0, typeIndex));
+          SoundManager.playTypeSound();
+          typeIndex++;
+        } else {
+          clearInterval(typeInterval);
+          setTimeout(() => setShowRiddle(true), 300);
+        }
+      }, 150);
+
+      // Start typing "trying protocol" after riddle appears
       setTimeout(() => {
         let index = 0;
         const protocolCommand = "trying protocol";
@@ -168,7 +195,7 @@ export default function TerminalRiddle({
             }, 300);
           }
         }, 150);
-      }, 400);
+      }, 1800);
     }, 400);
   };
 
@@ -370,17 +397,110 @@ export default function TerminalRiddle({
             </div>
           )}
 
-          {/* Command line - removed, no need to show initial command */}
-
-          {/* Main input and interaction section */}
+          {/* Command line */}
           <div
             style={{
-              animation: "fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both",
+              marginBottom: showRiddle ? 28 : 0,
+              minHeight: 40,
+              display: "flex",
+              alignItems: "center",
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* Attempts counter */}
-            {attempts > 0 && (
+            <span style={{ color: "#0ff", marginRight: 12, fontSize: 18 }}>
+              ▶
+            </span>
+            <span style={{ color: "#c0f", fontSize: 16, letterSpacing: 1 }}>
+              {commandText}
+            </span>
+            {!showRiddle && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 10,
+                  height: 20,
+                  background: "#c0f",
+                  marginLeft: 6,
+                  animation: "blink 0.8s step-end infinite",
+                  boxShadow: "0 0 8px #c0f",
+                }}
+              />
+            )}
+          </div>
+
+          {/* Riddle output */}
+          {showRiddle && (
+            <div
+              style={{
+                animation: "fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both",
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  marginBottom: 16,
+                  paddingBottom: 14,
+                  borderBottom: "1px solid rgba(0, 246, 255, 0.2)",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#0ff",
+                    fontSize: 13,
+                    letterSpacing: 3,
+                    textTransform: "uppercase",
+                    marginBottom: 20,
+                    textShadow: "0 0 10px #0ff",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ▸ RIDDLE DECRYPTED ▸
+                </div>
+
+                {RIDDLE_LINES.map((line, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 16,
+                      marginBottom: 14,
+                      paddingLeft: 16,
+                      borderLeft: `3px solid ${
+                        index === 4 ? "rgba(0, 255, 255, 0.8)" : "rgba(192, 0, 255, 0.5)"
+                      }`,
+                      animation: `fadeInLeft 0.6s cubic-bezier(0.22, 1, 0.36, 1) both`,
+                      animationDelay: `${index * 100}ms`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(192, 0, 255, 0.7)",
+                        minWidth: 22,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      [{String(index + 1).padStart(2, "0")}]
+                    </span>
+                    <CipherReveal
+                      text={line}
+                      delay={600 + index * 60}
+                      speed={20}
+                      color={index === 4 ? "#0ff" : "#c9b0ff"}
+                      finalColor={index === 4 ? "#0ff" : undefined}
+                      style={{
+                        fontSize: index === 4 ? 16 : 15,
+                        letterSpacing: index === 4 ? 2 : 0.5,
+                        fontFamily:
+                          index === 4 ? "'Orbitron', sans-serif" : "inherit",
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Attempts counter */}
               <div
                 style={{
                   marginBottom: 16,
@@ -393,177 +513,177 @@ export default function TerminalRiddle({
               >
                 ATTEMPTS: {attempts}/5
               </div>
-            )}
 
-            {/* Input section */}
-            <div style={{ marginTop: attempts > 0 ? 28 : 0 }}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 14,
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ color: "#0ff", fontSize: 18 }}>▶</span>
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => {
-                    setInput(e.target.value);
-                    SoundManager.playTypeSound();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleSubmit();
-                    }
-                  }}
-                  placeholder="answer..."
-                  className="terminal-input"
-                  disabled={solved || isSubmitting}
-                  style={{
-                    flex: 1,
-                    background: "rgba(192, 0, 255, 0.08)",
-                    border: `2px solid ${
-                      error && !solved
-                        ? "rgba(255, 79, 216, 0.6)"
-                        : "rgba(192, 0, 255, 0.4)"
-                    }`,
-                    color: "#c0f",
-                    fontFamily: "inherit",
-                    padding: "14px 18px",
-                    borderRadius: 6,
-                    fontSize: 15,
-                    outline: "none",
-                    transition: "all 0.3s ease",
-                    boxShadow:
-                      input && !error
-                        ? "0 0 16px rgba(192, 0, 255, 0.5)"
-                        : "none",
-                    opacity: solved || isSubmitting ? 0.6 : 1,
-                  }}
-                />
-                <button
-                  onClick={handleSubmit}
-                  disabled={solved || isSubmitting || !input.trim()}
-                  style={{
-                    padding: "12px 24px",
-                    background: solved
-                      ? "rgba(57, 255, 20, 0.25)"
-                      : "rgba(192, 0, 255, 0.25)",
-                    border: `2px solid ${solved ? "#39ff14" : "#c0f"}`,
-                    color: solved ? "#39ff14" : "#c0f",
-                    fontFamily: "inherit",
-                    fontSize: 13,
-                    fontWeight: "bold",
-                    borderRadius: 6,
-                    cursor:
-                      solved || isSubmitting ? "default" : "pointer",
-                    transition: "all 0.3s ease",
-                    boxShadow: solved
-                      ? "0 0 16px rgba(57, 255, 20, 0.4)"
-                      : "0 0 12px rgba(192, 0, 255, 0.4)",
-                    letterSpacing: 1.5,
-                    textTransform: "uppercase",
-                    opacity: isSubmitting ? 0.7 : 1,
-                  }}
-                >
-                  {solved ? "✓ SOLVED" : isSubmitting ? "..." : "SUBMIT"}
-                </button>
-              </div>
-
-              {error && !solved && (
+              {/* Input section */}
+              <div style={{ marginTop: 28 }}>
                 <div
                   style={{
-                    marginTop: 14,
-                    color: "#ff4fd8",
-                    fontSize: 13,
-                    textShadow: "0 0 8px rgba(255, 79, 216, 0.7)",
-                    animation: "shake 0.4s ease-in-out",
+                    display: "flex",
+                    gap: 14,
+                    alignItems: "center",
                   }}
-                  className={glitchClass}
                 >
-                  ✗ {error}
-                </div>
-              )}
-
-              {solved && (
-                <div style={{ marginTop: 20 }}>
-                  <div
-                    style={{
-                      marginBottom: 14,
-                      color: "#39ff14",
-                      fontSize: 13,
-                      textShadow: "0 0 10px rgba(57, 255, 20, 0.8)",
-                      animation: "fadeInUp 0.5s ease both",
+                  <span style={{ color: "#0ff", fontSize: 18 }}>▶</span>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      SoundManager.playTypeSound();
                     }}
-                  >
-                    ✓ PROTOCOL UNLOCKED
-                  </div>
-
-                  {/* Character reveal */}
-                  <div
-                    style={{
-                      padding: 12,
-                      background: "rgba(57, 255, 20, 0.1)",
-                      border: "1px solid rgba(57, 255, 20, 0.3)",
-                      borderRadius: 4,
-                      marginBottom: 14,
-                      fontSize: 14,
-                      color: "#39ff14",
-                      letterSpacing: 3,
-                      textAlign: "center",
-                      fontWeight: "bold",
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSubmit();
+                      }
                     }}
-                  >
-                    {revealedAnswer}
-                    {revealedAnswer.length < ANSWER.length && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: 10,
-                          height: 20,
-                          background: "#39ff14",
-                          marginLeft: 6,
-                          animation: "blink 0.8s step-end infinite",
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Share button */}
-                  <button
-                    onClick={shareSuccess}
+                    placeholder="answer..."
+                    className="terminal-input"
+                    disabled={solved || isSubmitting}
                     style={{
-                      width: "100%",
-                      padding: "12px 20px",
-                      background: "rgba(0, 246, 255, 0.15)",
-                      border: "2px solid #0ff",
-                      color: "#0ff",
+                      flex: 1,
+                      background: "rgba(192, 0, 255, 0.08)",
+                      border: `2px solid ${
+                        error && !solved
+                          ? "rgba(255, 79, 216, 0.6)"
+                          : "rgba(192, 0, 255, 0.4)"
+                      }`,
+                      color: "#c0f",
                       fontFamily: "inherit",
-                      fontSize: 12,
+                      padding: "14px 18px",
+                      borderRadius: 6,
+                      fontSize: 15,
+                      outline: "none",
+                      transition: "all 0.3s ease",
+                      boxShadow:
+                        input && !error
+                          ? "0 0 16px rgba(192, 0, 255, 0.5)"
+                          : "none",
+                      opacity: solved || isSubmitting ? 0.6 : 1,
+                    }}
+                  />
+                  <button
+                    onClick={handleSubmit}
+                    disabled={solved || isSubmitting || !input.trim()}
+                    style={{
+                      padding: "12px 24px",
+                      background: solved
+                        ? "rgba(57, 255, 20, 0.25)"
+                        : "rgba(192, 0, 255, 0.25)",
+                      border: `2px solid ${solved ? "#39ff14" : "#c0f"}`,
+                      color: solved ? "#39ff14" : "#c0f",
+                      fontFamily: "inherit",
+                      fontSize: 13,
                       fontWeight: "bold",
                       borderRadius: 6,
-                      cursor: "pointer",
+                      cursor:
+                        solved || isSubmitting ? "default" : "pointer",
                       transition: "all 0.3s ease",
-                      textTransform: "uppercase",
+                      boxShadow: solved
+                        ? "0 0 16px rgba(57, 255, 20, 0.4)"
+                        : "0 0 12px rgba(192, 0, 255, 0.4)",
                       letterSpacing: 1.5,
-                      boxShadow: "0 0 12px rgba(0, 246, 255, 0.3)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.boxShadow =
-                        "0 0 20px rgba(0, 246, 255, 0.6)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.boxShadow =
-                        "0 0 12px rgba(0, 246, 255, 0.3)";
+                      textTransform: "uppercase",
+                      opacity: isSubmitting ? 0.7 : 1,
                     }}
                   >
-                    🔐 SHARE SUCCESS
+                    {solved ? "✓ SOLVED" : isSubmitting ? "..." : "SUBMIT"}
                   </button>
                 </div>
-              )}
+
+                {error && !solved && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      color: "#ff4fd8",
+                      fontSize: 13,
+                      textShadow: "0 0 8px rgba(255, 79, 216, 0.7)",
+                      animation: "shake 0.4s ease-in-out",
+                    }}
+                    className={glitchClass}
+                  >
+                    ✗ {error}
+                  </div>
+                )}
+
+                {solved && (
+                  <div style={{ marginTop: 20 }}>
+                    <div
+                      style={{
+                        marginBottom: 14,
+                        color: "#39ff14",
+                        fontSize: 13,
+                        textShadow: "0 0 10px rgba(57, 255, 20, 0.8)",
+                        animation: "fadeInUp 0.5s ease both",
+                      }}
+                    >
+                      ✓ PROTOCOL UNLOCKED
+                    </div>
+
+                    {/* Character reveal */}
+                    <div
+                      style={{
+                        padding: 12,
+                        background: "rgba(57, 255, 20, 0.1)",
+                        border: "1px solid rgba(57, 255, 20, 0.3)",
+                        borderRadius: 4,
+                        marginBottom: 14,
+                        fontSize: 14,
+                        color: "#39ff14",
+                        letterSpacing: 3,
+                        textAlign: "center",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {revealedAnswer}
+                      {revealedAnswer.length < ANSWER.length && (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 10,
+                            height: 20,
+                            background: "#39ff14",
+                            marginLeft: 6,
+                            animation: "blink 0.8s step-end infinite",
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Share button */}
+                    <button
+                      onClick={shareSuccess}
+                      style={{
+                        width: "100%",
+                        padding: "12px 20px",
+                        background: "rgba(0, 246, 255, 0.15)",
+                        border: "2px solid #0ff",
+                        color: "#0ff",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        fontWeight: "bold",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        transition: "all 0.3s ease",
+                        textTransform: "uppercase",
+                        letterSpacing: 1.5,
+                        boxShadow: "0 0 12px rgba(0, 246, 255, 0.3)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.boxShadow =
+                          "0 0 20px rgba(0, 246, 255, 0.6)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.boxShadow =
+                          "0 0 12px rgba(0, 246, 255, 0.3)";
+                      }}
+                    >
+                      🔐 SHARE SUCCESS
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
