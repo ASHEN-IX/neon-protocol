@@ -5,6 +5,12 @@ export default function TerminalLoader({ onComplete }) {
   const [displayText, setDisplayText] = useState("");
   const [showCursor, setShowCursor] = useState(true);
   const [loader, setLoader] = useState("");
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.matchMedia("(max-width: 820px)").matches;
+  });
   const canvasRef = useRef(null);
 
   SoundManager.init();
@@ -23,12 +29,18 @@ export default function TerminalLoader({ onComplete }) {
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
     const chars = "アイウエオカキクケコ█▓▒░01∑∆Ω∞≈≠∂∫ΨΦΓ╬╫╪│┼";
-    const columns = Math.floor(canvas.width / 20);
-    const drops = Array(columns).fill(0);
+    const cellSize = isMobileViewport ? 14 : 20;
+    let drops = [];
+
+    const setupCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const columns = Math.max(1, Math.floor(canvas.width / cellSize));
+      drops = Array(columns).fill(0);
+    };
+
+    setupCanvas();
     let animId = null;
 
     const draw = () => {
@@ -36,14 +48,14 @@ export default function TerminalLoader({ onComplete }) {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.fillStyle = "rgba(0,246,255,0.05)";
-      ctx.font = "20px 'Share Tech Mono'";
+      ctx.font = `${cellSize}px 'Share Tech Mono'`;
 
       for (let i = 0; i < drops.length; i++) {
         const char = chars.charAt(Math.floor(Math.random() * chars.length));
-        ctx.fillText(char, i * 20, drops[i] * 20);
+        ctx.fillText(char, i * cellSize, drops[i] * cellSize);
         drops[i]++;
 
-        if (drops[i] * 20 > canvas.height && Math.random() > 0.975) {
+        if (drops[i] * cellSize > canvas.height && Math.random() > 0.975) {
           drops[i] = 0;
         }
       }
@@ -52,12 +64,33 @@ export default function TerminalLoader({ onComplete }) {
     };
 
     draw();
-    window.addEventListener("resize", () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    });
+    window.addEventListener("resize", setupCanvas);
 
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", setupCanvas);
+    };
+  }, [isMobileViewport]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 820px)");
+    const handleViewportChange = (event) => {
+      setIsMobileViewport(event.matches);
+    };
+
+    setIsMobileViewport(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleViewportChange);
+      return () => mediaQuery.removeEventListener("change", handleViewportChange);
+    }
+
+    mediaQuery.addListener(handleViewportChange);
+    return () => mediaQuery.removeListener(handleViewportChange);
   }, []);
 
   // Type text "Project Neon awakens"
@@ -125,13 +158,13 @@ export default function TerminalLoader({ onComplete }) {
         style={{
           position: "relative",
           zIndex: 10,
-          width: "min(800px, 90vw)",
+          width: isMobileViewport ? "94vw" : "min(800px, 90vw)",
           border: "2px solid rgba(192, 0, 255, 0.8)",
-          borderRadius: 8,
+          borderRadius: isMobileViewport ? 6 : 8,
           background: "rgba(2, 0, 12, 0.6)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          padding: "48px 56px",
+          padding: isMobileViewport ? "22px 16px" : "48px 56px",
           boxShadow:
             "0 0 60px rgba(192, 0, 255, 0.3), inset 0 0 60px rgba(0, 246, 255, 0.1)",
           animation: "fadeInScale 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
@@ -156,16 +189,16 @@ export default function TerminalLoader({ onComplete }) {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 14,
-            marginBottom: 32,
-            paddingBottom: 18,
+            gap: isMobileViewport ? 8 : 14,
+            marginBottom: isMobileViewport ? 20 : 32,
+            paddingBottom: isMobileViewport ? 12 : 18,
             borderBottom: "1px solid rgba(192, 0, 255, 0.3)",
           }}
         >
           <div
             style={{
-              width: 14,
-              height: 14,
+              width: isMobileViewport ? 10 : 14,
+              height: isMobileViewport ? 10 : 14,
               borderRadius: "50%",
               background: "#0ff",
               boxShadow: "0 0 12px #0ff",
@@ -175,11 +208,12 @@ export default function TerminalLoader({ onComplete }) {
           <span
             style={{
               color: "#0ff",
-              fontSize: 15,
-              letterSpacing: 3,
+              fontSize: isMobileViewport ? 11 : 15,
+              letterSpacing: isMobileViewport ? 1 : 3,
               textTransform: "uppercase",
               fontWeight: "bold",
               textShadow: "0 0 10px #0ff",
+              lineHeight: 1.4,
             }}
           >
             NEON CORE INITIALIZATION
@@ -189,11 +223,11 @@ export default function TerminalLoader({ onComplete }) {
         {/* Main text area */}
         <div
           style={{
-            minHeight: 120,
+            minHeight: isMobileViewport ? 88 : 120,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            gap: 32,
+            gap: isMobileViewport ? 22 : 32,
           }}
         >
           {/* Project Neon awakens text */}
@@ -201,18 +235,19 @@ export default function TerminalLoader({ onComplete }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: isMobileViewport ? 8 : 12,
             }}
           >
-            <span style={{ color: "#0ff", fontSize: 18 }}>▶</span>
+            <span style={{ color: "#0ff", fontSize: isMobileViewport ? 14 : 18 }}>▶</span>
             <span
               style={{
                 color: "#c0f",
-                fontSize: 28,
-                letterSpacing: 2,
+                fontSize: isMobileViewport ? 17 : 28,
+                letterSpacing: isMobileViewport ? 0.8 : 2,
                 fontWeight: "bold",
                 textShadow: "0 0 20px rgba(192, 0, 255, 0.6)",
-                minHeight: 35,
+                minHeight: isMobileViewport ? 22 : 35,
+                wordBreak: "break-word",
               }}
             >
               {displayText}
@@ -220,8 +255,8 @@ export default function TerminalLoader({ onComplete }) {
                 <span
                   style={{
                     display: "inline-block",
-                    width: 12,
-                    height: 28,
+                    width: isMobileViewport ? 8 : 12,
+                    height: isMobileViewport ? 18 : 28,
                     background: "#c0f",
                     marginLeft: 6,
                     boxShadow: "0 0 10px #c0f",
@@ -237,14 +272,14 @@ export default function TerminalLoader({ onComplete }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
-                paddingLeft: 30,
+                gap: isMobileViewport ? 10 : 14,
+                paddingLeft: isMobileViewport ? 0 : 30,
               }}
             >
               <span
                 style={{
                   color: "#0ff",
-                  fontSize: 20,
+                  fontSize: isMobileViewport ? 16 : 20,
                   fontWeight: "bold",
                   animation: "spin 0.6s linear infinite",
                 }}
@@ -254,8 +289,8 @@ export default function TerminalLoader({ onComplete }) {
               <span
                 style={{
                   color: "#0ff",
-                  fontSize: 14,
-                  letterSpacing: 1.5,
+                  fontSize: isMobileViewport ? 12 : 14,
+                  letterSpacing: isMobileViewport ? 0.8 : 1.5,
                   textShadow: "0 0 8px #0ff",
                 }}
               >
@@ -268,14 +303,16 @@ export default function TerminalLoader({ onComplete }) {
         {/* Status bar at bottom */}
         <div
           style={{
-            marginTop: 32,
-            paddingTop: 16,
+            marginTop: isMobileViewport ? 18 : 32,
+            paddingTop: isMobileViewport ? 12 : 16,
             borderTop: "1px solid rgba(0, 246, 255, 0.2)",
             display: "flex",
-            justifyContent: "space-between",
-            fontSize: 11,
+            justifyContent: isMobileViewport ? "flex-start" : "space-between",
+            flexDirection: isMobileViewport ? "column" : "row",
+            gap: isMobileViewport ? 6 : 0,
+            fontSize: isMobileViewport ? 10 : 11,
             color: "rgba(0, 246, 255, 0.6)",
-            letterSpacing: 1,
+            letterSpacing: isMobileViewport ? 0.5 : 1,
           }}
         >
           <span>STATUS: ONLINE</span>

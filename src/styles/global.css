@@ -19,6 +19,12 @@ body {
   cursor: crosshair;
 }
 
+@media (max-width: 820px) {
+  body {
+    cursor: default;
+  }
+}
+
 ::-webkit-scrollbar {
   display: none;
 }

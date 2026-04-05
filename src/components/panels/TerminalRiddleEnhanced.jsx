@@ -68,6 +68,12 @@ export default function TerminalRiddle({
   const [terminalFade, setTerminalFade] = useState(1);
   const [terminalKey, setTerminalKey] = useState(0);
   const [attemptConsumed, setAttemptConsumed] = useState(Boolean(persistedAttempt));
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.matchMedia("(max-width: 820px)").matches;
+  });
   const terminalRef = useRef(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
@@ -96,6 +102,35 @@ export default function TerminalRiddle({
     return () => clearInterval(interval);
   }, [attemptConsumed, terminalKey]);
 
+  // Responsive viewport detection
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 820px)");
+    const handleViewportChange = (event) => {
+      setIsMobileViewport(event.matches);
+    };
+
+    setIsMobileViewport(mediaQuery.matches);
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleViewportChange);
+      return () => mediaQuery.removeEventListener("change", handleViewportChange);
+    }
+
+    mediaQuery.addListener(handleViewportChange);
+    return () => mediaQuery.removeListener(handleViewportChange);
+  }, []);
+
+  useEffect(() => {
+    if (isMobileViewport) {
+      setIsDragging(false);
+      setTerminalPos({ x: 0, y: 0 });
+    }
+  }, [isMobileViewport]);
+
   // Random flicker effect
   useEffect(() => {
     const flickerInterval = setInterval(() => {
@@ -122,6 +157,10 @@ export default function TerminalRiddle({
   }, [solved, revealedAnswer]);
 
   const handleDragStart = (e) => {
+    if (isMobileViewport) {
+      return;
+    }
+
     setIsDragging(true);
     dragStartRef.current = { x: e.clientX - terminalPos.x, y: e.clientY - terminalPos.y };
   };
@@ -283,18 +322,20 @@ export default function TerminalRiddle({
         onMouseDown={handleDragStart}
         style={{
           position: "fixed",
-          top: `calc(50% + ${terminalPos.y}px)`,
-          left: `calc(50% + ${terminalPos.x}px)`,
+          top: isMobileViewport ? "50%" : `calc(50% + ${terminalPos.y}px)`,
+          left: isMobileViewport ? "50%" : `calc(50% + ${terminalPos.x}px)`,
           transform: "translate(-50%, -50%)",
           zIndex: 30,
-          width: "min(1000px, 95vw)",
-          maxHeight: "90vh",
+          width: isMobileViewport ? "100vw" : "min(1000px, 95vw)",
+          maxWidth: "100vw",
+          maxHeight: isMobileViewport ? "100dvh" : "90vh",
           fontFamily: "'Share Tech Mono', monospace",
           animation: "fadeInScale 0.8s cubic-bezier(0.22, 1, 0.36, 1) both",
-          cursor: isDragging ? "grabbing" : "grab",
+          cursor: isMobileViewport ? "default" : isDragging ? "grabbing" : "grab",
           opacity: hasFlicker ? 0.8 : terminalFade,
           filter: hasFlicker ? "brightness(1.2)" : "brightness(1)",
           transition: "opacity 400ms ease-in-out, filter 100ms",
+          touchAction: isMobileViewport ? "pan-y" : "none",
         }}
       >
         {/* Border glow */}
@@ -317,14 +358,14 @@ export default function TerminalRiddle({
             position: "relative",
             background: "rgba(2, 0, 12, 0.4)",
             border: "1px solid rgba(192, 0, 255, 0.5)",
-            borderRadius: 8,
-            padding: "48px 56px",
+            borderRadius: isMobileViewport ? 0 : 8,
+            padding: isMobileViewport ? "22px 14px 20px" : "48px 56px",
             backdropFilter: "blur(20px) saturate(180%)",
             WebkitBackdropFilter: "blur(20px) saturate(180%)",
             boxShadow:
               "0 0 60px rgba(192, 0, 255, 0.25), inset 0 0 60px rgba(0, 246, 255, 0.08)",
             overflow: "auto",
-            maxHeight: "85vh",
+            maxHeight: isMobileViewport ? "100dvh" : "85vh",
           }}
           className={glitchClass}
         >
@@ -333,9 +374,9 @@ export default function TerminalRiddle({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 14,
-              marginBottom: 32,
-              paddingBottom: 18,
+              gap: isMobileViewport ? 8 : 14,
+              marginBottom: isMobileViewport ? 20 : 32,
+              paddingBottom: isMobileViewport ? 12 : 18,
               borderBottom: "1px solid rgba(192, 0, 255, 0.3)",
               userSelect: "none",
             }}
@@ -343,8 +384,8 @@ export default function TerminalRiddle({
           >
             <div
               style={{
-                width: 14,
-                height: 14,
+                width: isMobileViewport ? 10 : 14,
+                height: isMobileViewport ? 10 : 14,
                 borderRadius: "50%",
                 background: "#0ff",
                 boxShadow: "0 0 12px #0ff",
@@ -354,8 +395,8 @@ export default function TerminalRiddle({
             <span
               style={{
                 color: "#0ff",
-                fontSize: 15,
-                letterSpacing: 3,
+                fontSize: isMobileViewport ? 12 : 15,
+                letterSpacing: isMobileViewport ? 1.5 : 3,
                 textTransform: "uppercase",
                 fontWeight: "bold",
                 textShadow: "0 0 10px #0ff",
@@ -366,12 +407,14 @@ export default function TerminalRiddle({
             <span
               style={{
                 marginLeft: "auto",
-                fontSize: 11,
+                fontSize: isMobileViewport ? 10 : 11,
                 color: "rgba(0,246,255,0.6)",
                 opacity: showHints ? 1 : 0.5,
+                cursor: "pointer",
               }}
+              onClick={() => setShowHints((prev) => !prev)}
             >
-              Press ? for help
+              {isMobileViewport ? "Tap for help" : "Press ? for help"}
             </span>
           </div>
 
@@ -410,14 +453,14 @@ export default function TerminalRiddle({
                 background: "rgba(192, 0, 255, 0.03)",
                 border: "1px solid rgba(192, 0, 255, 0.1)",
                 borderRadius: 4,
-                maxHeight: 180,
+                maxHeight: isMobileViewport ? "28dvh" : 180,
                 overflow: "auto",
-                fontSize: 12,
+                fontSize: isMobileViewport ? 11 : 12,
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
               {history.map((h, i) => (
-                <div key={i} style={{ color: h.startsWith("✓") ? "#39ff14" : h.startsWith("✗") ? "#ff4fd8" : "#c0f", marginBottom: 4, minHeight: h === "" ? 4 : "auto" }}>
+                <div key={i} style={{ color: h.startsWith("✓") ? "#39ff14" : h.startsWith("✗") ? "#ff4fd8" : "#c0f", marginBottom: 4, minHeight: h === "" ? 4 : "auto", wordBreak: "break-word" }}>
                   {h}
                 </div>
               ))}
@@ -458,16 +501,16 @@ export default function TerminalRiddle({
             <div
               style={{
                 marginBottom: showRiddle ? 28 : 0,
-                minHeight: 40,
+                minHeight: isMobileViewport ? 30 : 40,
                 display: "flex",
                 alignItems: "center",
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <span style={{ color: "#0ff", marginRight: 12, fontSize: 18 }}>
+              <span style={{ color: "#0ff", marginRight: 12, fontSize: isMobileViewport ? 14 : 18 }}>
                 ▶
               </span>
-              <span style={{ color: "#c0f", fontSize: 16, letterSpacing: 1 }}>
+              <span style={{ color: "#c0f", fontSize: isMobileViewport ? 13 : 16, letterSpacing: isMobileViewport ? 0.5 : 1 }}>
                 {commandText}
               </span>
               {!showRiddle && (
@@ -520,10 +563,11 @@ export default function TerminalRiddle({
                     key={index}
                     style={{
                       display: "flex",
-                      alignItems: "baseline",
-                      gap: 16,
+                      flexDirection: isMobileViewport ? "column" : "row",
+                      alignItems: isMobileViewport ? "flex-start" : "baseline",
+                      gap: isMobileViewport ? 8 : 16,
                       marginBottom: 14,
-                      paddingLeft: 16,
+                      paddingLeft: isMobileViewport ? 10 : 16,
                       borderLeft: `3px solid ${
                         index === 4 ? "rgba(0, 255, 255, 0.8)" : "rgba(192, 0, 255, 0.5)"
                       }`,
@@ -548,8 +592,10 @@ export default function TerminalRiddle({
                       color={index === 4 ? "#0ff" : "#c9b0ff"}
                       finalColor={index === 4 ? "#0ff" : undefined}
                       style={{
-                        fontSize: index === 4 ? 16 : 15,
-                        letterSpacing: index === 4 ? 2 : 0.5,
+                        fontSize: isMobileViewport ? (index === 4 ? 14 : 13) : (index === 4 ? 16 : 15),
+                        letterSpacing: isMobileViewport ? 0.4 : index === 4 ? 2 : 0.5,
+                        lineHeight: 1.5,
+                        wordBreak: "break-word",
                         fontFamily:
                           index === 4 ? "'Orbitron', sans-serif" : "inherit",
                       }}
@@ -573,15 +619,16 @@ export default function TerminalRiddle({
               </div>
 
               {/* Input section */}
-              <div style={{ marginTop: 28 }}>
+              <div style={{ marginTop: isMobileViewport ? 16 : 28 }}>
                 <div
                   style={{
                     display: "flex",
-                    gap: 14,
-                    alignItems: "center",
+                    gap: isMobileViewport ? 10 : 14,
+                    alignItems: isMobileViewport ? "stretch" : "center",
+                    flexDirection: isMobileViewport ? "column" : "row",
                   }}
                 >
-                  <span style={{ color: "#0ff", fontSize: 18 }}>▶</span>
+                  <span style={{ color: "#0ff", fontSize: isMobileViewport ? 16 : 18, alignSelf: isMobileViewport ? "flex-start" : "center" }}>▶</span>
                   <input
                     type="text"
                     value={input}
@@ -607,9 +654,9 @@ export default function TerminalRiddle({
                       }`,
                       color: "#c0f",
                       fontFamily: "inherit",
-                      padding: "14px 18px",
+                      padding: isMobileViewport ? "13px 14px" : "14px 18px",
                       borderRadius: 6,
-                      fontSize: 15,
+                      fontSize: isMobileViewport ? 16 : 15,
                       outline: "none",
                       transition: "all 0.3s ease",
                       boxShadow:
@@ -642,6 +689,8 @@ export default function TerminalRiddle({
                       letterSpacing: 1.5,
                       textTransform: "uppercase",
                       opacity: isSubmitting ? 0.7 : 1,
+                      width: isMobileViewport ? "100%" : "auto",
+                      minHeight: isMobileViewport ? 46 : "auto",
                     }}
                   >
                     {solved ? "✓ SOLVED" : isSubmitting ? "..." : "SUBMIT"}
@@ -831,6 +880,12 @@ export default function TerminalRiddle({
         .terminal-input:disabled {
           cursor: not-allowed;
           opacity: 0.5;
+        }
+
+        @media (max-width: 820px) {
+          .terminal-input {
+            font-size: 16px !important;
+          }
         }
 
         .glitch {
